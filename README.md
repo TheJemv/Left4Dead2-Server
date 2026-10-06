@@ -34,7 +34,7 @@ El primer arranque descarga unos 12 GB (servidor y campañas). Si el servidor es
 
 ## Configuración
 
-- **`docker-compose.yml`:** nombre del servidor, jugadores, dificultad, mapa inicial y `WORKSHOP_IDS`.
+- **`docker-compose.yml`:** nombre del servidor, jugadores, dificultad, mapa inicial, VAC (`VAC: "0"` = desactivado) y `WORKSHOP_IDS`.
 - **`config/`:** se copia encima de `left4dead2/` en cada arranque.
   - `cfg/server.cfg`
   - `cfg/sourcemod/l4dmultislots.cfg`: para jugar siempre con 8 (bots incluidos), pon `min_survivors "8"` y `spawn_survivors_roundstart "1"`.

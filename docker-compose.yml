@@ -29,6 +29,7 @@ services:
       GAME_MODE: "coop"
       DIFFICULTY: "Normal"        # Easy | Normal | Hard | Impossible
       START_MAP: "glubtastic2_1"  # glubtastic4_1, glubtastic5_1, c1m1_hotel...
+      VAC: "0"                    # 1 = antitrampas VAC activado, 0 = desactivado (-insecure)
       RCON_PASSWORD: "${RCON_PASSWORD:-}"
       SERVER_PASSWORD: "${SERVER_PASSWORD:-}"
       # Mods/campañas del Steam Workshop (se descargan y actualizan solos):

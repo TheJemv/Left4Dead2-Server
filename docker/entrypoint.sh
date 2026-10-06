@@ -127,7 +127,12 @@ download_workshop
 
 log "Iniciando servidor en el puerto 27015 (mapa ${START_MAP:-c1m1_hotel}, modo ${GAME_MODE:-coop})"
 cd "$SERVER_DIR"
-exec ./srcds_run -game left4dead2 -console -norestart -port 27015 \
+extra_args=()
+if [[ "${VAC:-1}" == "0" ]]; then
+  log "VAC desactivado (-insecure)"
+  extra_args+=(-insecure)
+fi
+exec ./srcds_run -game left4dead2 -console -norestart -port 27015 "${extra_args[@]}" \
   +sv_setmax 31 \
   +mp_gamemode "${GAME_MODE:-coop}" \
   +map "${START_MAP:-c1m1_hotel}"
