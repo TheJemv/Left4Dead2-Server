@@ -1,0 +1,53 @@
+# Servidor dedicado Left 4 Dead 2 — cooperativo de 8 jugadores + campañas Glubtastic
+#
+#   Arrancar:      docker compose up -d --build
+#   Ver logs:      docker compose logs -f
+#   Consola:       docker attach l4d2-server      (salir sin apagar: Ctrl+P, Ctrl+Q)
+#   Apagar:        docker compose down
+#
+# El primer arranque descarga ~12 GB (servidor + campañas); tarda bastante.
+
+name: l4d2
+
+services:
+  l4d2:
+    build:
+      context: ./docker
+      args:
+        MMS_BRANCH: "1.12"        # MetaMod:Source
+        SM_BRANCH: "1.12"         # SourceMod (estable)
+        L4DTOOLZ_VERSION: "2.5.1" # github.com/lakwsh/l4dtoolz
+    image: l4d2-8players:latest
+    container_name: l4d2-server
+    restart: unless-stopped
+    ports:
+      - "27015:27015/tcp"
+      - "27015:27015/udp"
+    environment:
+      SERVER_NAME: "L4D2 8 Jugadores | Glubtastic"
+      MAX_PLAYERS: "8"            # jugadores humanos (L4DToolZ sv_maxplayers)
+      GAME_MODE: "coop"
+      DIFFICULTY: "Normal"        # Easy | Normal | Hard | Impossible
+      START_MAP: "glubtastic2_1"  # glubtastic4_1, glubtastic5_1, c1m1_hotel...
+      RCON_PASSWORD: "${RCON_PASSWORD:-}"
+      SERVER_PASSWORD: "${SERVER_PASSWORD:-}"
+      # Mods/campañas del Steam Workshop (se descargan y actualizan solos):
+      #   2276071285  8 Player Lobby (mutación de lobby de 8)
+      #   2066106924  Glubtastic 2
+      #   2459037122  Glubtastic 4
+      #   3366491323  Glubtastic 5
+      WORKSHOP_IDS: >-
+        2276071285
+        2066106924
+        2459037122
+        3366491323
+      UPDATE_ON_START: "1"        # 0 = no buscar actualizaciones del juego al arrancar
+    volumes:
+      - l4d2-data:/home/steam/l4d2   # archivos del juego (persisten entre reinicios)
+      - ./config:/config:ro          # se copia encima de left4dead2/ en cada arranque
+    stdin_open: true
+    tty: true
+    stop_grace_period: 30s
+
+volumes:
+  l4d2-data:
