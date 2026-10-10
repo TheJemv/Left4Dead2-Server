@@ -4,7 +4,6 @@ set -euo pipefail
 SERVER_DIR="/home/steam/l4d2"
 GAME_DIR="$SERVER_DIR/left4dead2"
 STEAMCMD="${STEAMCMDDIR:-/home/steam/steamcmd}/steamcmd.sh"
-WORKSHOP_STATE="$SERVER_DIR/.workshop"
 
 log() { printf '\n>> %s\n' "$*"; }
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
@@ -45,11 +44,18 @@ link_steamclient() {
 }
 
 # ---------------------------------------------------------------------------
-# 2) MetaMod + SourceMod + L4DToolZ + plugins (de la imagen) y config del usuario
+# 2) MetaMod + SourceMod (solo admins, de la imagen) y config del usuario
 # ---------------------------------------------------------------------------
-install_mods() {
-  log "Copiando MetaMod, SourceMod, L4DToolZ y plugins de 8 jugadores..."
-  cp -r /opt/l4d2/mods/. "$GAME_DIR/"
+install_sourcemod() {
+  # Juego vanilla: plugins/ se rehace en cada arranque (los de SourceMod + los de
+  # config/). También quita lo que dejó en el volumen la versión de 8 jugadores
+  # (L4DToolZ, sus plugins y los mapas del Workshop).
+  rm -rf "$GAME_DIR/addons/sourcemod/plugins" "$SERVER_DIR/.workshop"
+  rm -f "$GAME_DIR"/addons/l4dtoolz.* "$GAME_DIR"/addons/workshop_*.vpk \
+    "$GAME_DIR/cfg/sourcemod/l4dmultislots.cfg"
+
+  log "Copiando MetaMod y SourceMod (solo para admins)..."
+  cp -r /opt/l4d2/sourcemod/. "$GAME_DIR/"
 
   if [[ -d /config ]]; then
     log "Aplicando ./config sobre left4dead2/..."
@@ -59,73 +65,20 @@ install_mods() {
   # Valores que vienen de docker-compose.yml (server.cfg hace 'exec env.cfg').
   cat > "$GAME_DIR/cfg/env.cfg" <<EOF
 // Generado por entrypoint.sh desde docker-compose.yml. No editar: se sobrescribe.
-hostname "${SERVER_NAME:-L4D2 8 Jugadores}"
+hostname "${SERVER_NAME:-L4D2 Versus}"
 rcon_password "${RCON_PASSWORD:-}"
 sv_password "${SERVER_PASSWORD:-}"
-sv_maxplayers ${MAX_PLAYERS:-8}
-sv_visiblemaxplayers ${MAX_PLAYERS:-8}
-z_difficulty "${DIFFICULTY:-Normal}"
 EOF
 }
 
 # ---------------------------------------------------------------------------
-# 3) Workshop: descarga los .vpk vía la API pública de Steam (sin login)
-# ---------------------------------------------------------------------------
-download_workshop() {
-  local raw="${WORKSHOP_IDS:-}" ids
-  read -r -a ids <<<"${raw//,/ }"
-  mkdir -p "$WORKSHOP_STATE" "$GAME_DIR/addons"
-
-  # Borra los .vpk de items que ya no están en WORKSHOP_IDS.
-  local f id
-  for f in "$GAME_DIR"/addons/workshop_*.vpk; do
-    [[ -e "$f" ]] || continue
-    id="$(basename "$f" .vpk)"; id="${id#workshop_}"
-    if [[ " ${ids[*]} " != *" $id "* ]]; then
-      echo "   - quitando $id"
-      rm -f "$f" "$WORKSHOP_STATE/$id"
-    fi
-  done
-
-  (( ${#ids[@]} )) || return 0
-  log "Steam Workshop: ${ids[*]}"
-
-  local args=(-d "itemcount=${#ids[@]}") i=0 json
-  for id in "${ids[@]}"; do args+=(-d "publishedfileids[$i]=$id"); i=$((i + 1)); done
-  json="$(curl -fsSL --retry 5 --retry-delay 5 \
-    https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/ "${args[@]}")"
-
-  # "-" como relleno: con IFS=tab, read colapsa campos vacíos.
-  local result updated size url title vpk
-  while IFS=$'\t' read -r id result updated size url title; do
-    vpk="$GAME_DIR/addons/workshop_$id.vpk"
-    if [[ "$result" != "1" || "$url" == "-" ]]; then
-      echo "   ! $id: no disponible en el Workshop (result=$result), se omite"
-      continue
-    fi
-    if [[ -f "$vpk" && "$(cat "$WORKSHOP_STATE/$id" 2>/dev/null)" == "$updated" ]]; then
-      echo "   = $title ($id) al día"
-      continue
-    fi
-    echo "   v $title ($id) — $((size / 1024 / 1024)) MB, descargando..."
-    curl -fSL --retry 5 --retry-delay 5 -s -o "$vpk.part" "$url"
-    mv "$vpk.part" "$vpk"
-    echo "$updated" >"$WORKSHOP_STATE/$id"
-  done < <(jq -r '.response.publishedfiledetails[]
-      | [ .publishedfileid, (.result | tostring), (.time_updated // 0 | tostring),
-          (.file_size // "0" | tostring), (.file_url // "-" | if . == "" then "-" else . end),
-          (.title // "-") ] | @tsv' <<<"$json")
-}
-
-# ---------------------------------------------------------------------------
-# 4) Arrancar srcds
+# 3) Arrancar srcds
 # ---------------------------------------------------------------------------
 install_server
 link_steamclient
-install_mods
-download_workshop
+install_sourcemod
 
-log "Iniciando servidor en el puerto 27015 (mapa ${START_MAP:-c1m1_hotel}, modo ${GAME_MODE:-coop})"
+log "Iniciando servidor en el puerto 27015 (mapa ${START_MAP:-c1m1_hotel}, modo ${GAME_MODE:-versus})"
 cd "$SERVER_DIR"
 extra_args=()
 if [[ "${VAC:-1}" == "0" ]]; then
@@ -133,6 +86,5 @@ if [[ "${VAC:-1}" == "0" ]]; then
   extra_args+=(-insecure)
 fi
 exec ./srcds_run -game left4dead2 -console -norestart -port 27015 "${extra_args[@]}" \
-  +sv_setmax 31 \
-  +mp_gamemode "${GAME_MODE:-coop}" \
+  +mp_gamemode "${GAME_MODE:-versus}" \
   +map "${START_MAP:-c1m1_hotel}"

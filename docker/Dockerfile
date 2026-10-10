@@ -2,18 +2,17 @@ FROM cm2network/steamcmd:root
 
 ARG MMS_BRANCH=1.12
 ARG SM_BRANCH=1.12
-ARG L4DTOOLZ_VERSION=2.5.1
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl jq unzip lib32z1 \
+ && apt-get install -y --no-install-recommends ca-certificates curl lib32z1 \
  && rm -rf /var/lib/apt/lists/*
 
-COPY install-mods.sh entrypoint.sh /opt/l4d2/
+COPY install-sourcemod.sh entrypoint.sh /opt/l4d2/
 
 # sed: por si los .sh se guardaron con finales de línea de Windows (CRLF)
 RUN sed -i 's/\r$//' /opt/l4d2/*.sh \
  && chmod +x /opt/l4d2/*.sh \
- && /opt/l4d2/install-mods.sh /opt/l4d2/mods \
+ && /opt/l4d2/install-sourcemod.sh /opt/l4d2/sourcemod \
  && mkdir -p /home/steam/l4d2 \
  && chown -R steam:steam /home/steam/l4d2 /opt/l4d2
 
